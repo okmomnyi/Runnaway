@@ -98,4 +98,4 @@
 </main>
 
 <%- include('partials/foot') %>
-<script src="/public/js/app.js" defer></script>
+<script src="/public/js/app.js?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>" defer></script>

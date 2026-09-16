@@ -37,8 +37,12 @@ app.use(attachUser);
 
 // Config the client needs (stale threshold), exposed to views.
 const STALE_AFTER_DAYS = Number(process.env.STALE_AFTER_DAYS) || 30;
+// Version stamp appended to static asset URLs so a new release busts the
+// browser cache (static assets are served with a 1h max-age).
+const ASSET_VERSION = require('../package.json').version;
 app.use((req, res, next) => {
   res.locals.staleAfterDays = STALE_AFTER_DAYS;
+  res.locals.assetVersion = ASSET_VERSION;
   next();
 });
 
