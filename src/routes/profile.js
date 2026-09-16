@@ -6,6 +6,17 @@ const { pool } = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
 const { extractText } = require('../services/cvParser');
 const { extractProfileFromCV } = require('../services/nvidia');
+const google = require('../services/google');
+
+// Human-readable banners for the ?gmail=... redirect codes.
+const GMAIL_NOTICES = {
+  connected: { kind: 'success', text: 'Gmail connected. Replies from companies will be tracked automatically.' },
+  disconnected: { kind: 'info', text: 'Gmail disconnected. Reply-tracking is off.' },
+  denied: { kind: 'error', text: 'Gmail connection was cancelled.' },
+  error: { kind: 'error', text: 'Could not connect Gmail. Please try again.' },
+  norefresh: { kind: 'error', text: 'Google did not return a refresh token. Remove the app from your Google account access, then reconnect.' },
+  notconfigured: { kind: 'error', text: 'Gmail integration is not configured on the server yet.' },
+};
 
 const router = express.Router();
 
@@ -39,11 +50,31 @@ async function loadProfile(userId) {
   return inserted.rows[0];
 }
 
+async function loadGmail(userId) {
+  const { rows } = await pool.query(
+    'SELECT google_email, gmail_connected_at, gmail_last_sync FROM users WHERE id = $1',
+    [userId]
+  );
+  const u = rows[0] || {};
+  return {
+    configured: google.isConfigured(),
+    connected: Boolean(u.google_email),
+    email: u.google_email || null,
+    connectedAt: u.gmail_connected_at || null,
+    lastSync: u.gmail_last_sync || null,
+  };
+}
+
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const profile = await loadProfile(req.user.id);
+    const [profile, gmail] = await Promise.all([
+      loadProfile(req.user.id),
+      loadGmail(req.user.id),
+    ]);
     res.render('profile', {
       profile,
+      gmail,
+      gmailNotice: GMAIL_NOTICES[req.query.gmail] || null,
       welcome: req.query.welcome === '1',
       saved: req.query.saved === '1',
     });
@@ -51,6 +82,8 @@ router.get('/profile', requireAuth, async (req, res) => {
     console.error('[profile] load failed:', err.message);
     res.status(500).render('profile', {
       profile: null,
+      gmail: null,
+      gmailNotice: null,
       welcome: false,
       saved: false,
       loadError: 'Could not load your profile. Please refresh.',
@@ -71,8 +104,11 @@ router.post('/profile', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[profile] save failed:', err.message);
     const profile = await loadProfile(req.user.id).catch(() => null);
+    const gmail = await loadGmail(req.user.id).catch(() => null);
     res.status(500).render('profile', {
       profile,
+      gmail,
+      gmailNotice: null,
       welcome: false,
       saved: false,
       loadError: 'Could not save your profile. Please try again.',
@@ -108,10 +144,11 @@ router.post('/profile/import-cv', requireAuth, (req, res) => {
       const message =
         err.code === 'NO_API_KEY'
           ? 'CV import is not configured on the server (missing NVIDIA_API_KEY).'
-          : err.code === 'BAD_TYPE'
+          : err.code === 'BAD_TYPE' || err.code === 'TIMEOUT'
           ? err.message
           : `Could not import that CV: ${err.message}`;
-      const status = err.code === 'BAD_TYPE' ? 415 : 502;
+      const status =
+        err.code === 'BAD_TYPE' ? 415 : err.code === 'TIMEOUT' ? 503 : 502;
       return res.status(status).json({ error: message });
     }
   });

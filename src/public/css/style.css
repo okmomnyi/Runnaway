@@ -413,6 +413,16 @@ a:hover { color: var(--accent-strong); text-decoration: underline; }
 .cv-msg-error { color: var(--danger); }
 .field-filled { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.18); transition: box-shadow 0.3s, border-color 0.3s; }
 
+/* ---- Gmail connect -------------------------------------------------------- */
+
+.gmail-status { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.gmail-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.gmail-dot-on { background: var(--success); box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2); }
+.gmail-dot-off { background: var(--text-muted); opacity: 0.6; }
+.gmail-line { font-size: var(--fs-sm); }
+.gmail-sub { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px; }
+.gmail-actions { margin-left: auto; }
+
 /* ---- Skip link ----------------------------------------------------------- */
 
 .skip-link {

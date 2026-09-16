@@ -210,6 +210,9 @@ router.post('/:id/draft', async (req, res) => {
       )
       .catch(() => {});
 
+    if (err.code === 'TIMEOUT') {
+      return res.status(503).json({ error: err.message });
+    }
     const message =
       err.code === 'NO_API_KEY'
         ? 'AI drafting is not configured. Add NVIDIA_API_KEY to your .env.'

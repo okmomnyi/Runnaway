@@ -52,3 +52,20 @@ CREATE TABLE IF NOT EXISTS companies (
 
 CREATE INDEX IF NOT EXISTS idx_companies_user ON companies(user_id);
 CREATE INDEX IF NOT EXISTS idx_companies_user_status ON companies(user_id, status);
+
+-- Gmail integration (optional): reply-tracking via the Gmail API.
+-- Added with ADD COLUMN IF NOT EXISTS so this stays idempotent on existing DBs.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token TEXT; -- AES-encrypted at rest
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gmail_connected_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gmail_last_sync TIMESTAMPTZ;
+
+-- Dedupe: which Gmail messages we've already processed per user.
+CREATE TABLE IF NOT EXISTS gmail_seen (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  gmail_msg_id TEXT NOT NULL,
+  company_id   INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+  applied_status TEXT,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, gmail_msg_id)
+);

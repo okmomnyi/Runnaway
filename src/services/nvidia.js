@@ -12,6 +12,18 @@ function typedError(message, code) {
   return err;
 }
 
+// AbortController-based timeout. User-facing calls (draft, CV) default to 90s
+// so they return a clean error before Cloudflare's ~100s origin timeout 524s.
+// Override per call, or globally via NVIDIA_TIMEOUT_MS.
+function makeTimeout(defaultMs) {
+  const ms = Number(process.env.NVIDIA_TIMEOUT_MS) || defaultMs || 90000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
+
+const BUSY_MESSAGE = 'The AI service is busy right now. Please try again in a moment.';
+
 const SYSTEM_PROMPT = [
   'You write short, specific, professional cold emails requesting an industrial',
   'attachment (student internship) at a named company.',
@@ -63,11 +75,13 @@ async function draftEmail(profile, company) {
   }
 
   const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
+  const t = makeTimeout(90000);
 
   let response;
   try {
     response = await fetch(url, {
       method: 'POST',
+      signal: t.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
@@ -83,7 +97,10 @@ async function draftEmail(profile, company) {
       }),
     });
   } catch (err) {
+    if (err.name === 'AbortError') throw typedError(BUSY_MESSAGE, 'TIMEOUT');
     throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
+  } finally {
+    t.clear();
   }
 
   if (!response.ok) {
@@ -172,11 +189,13 @@ async function extractProfileFromCV(cvText) {
   // Keep the prompt within sane bounds for the model's context window.
   const text = String(cvText || '').slice(0, 12000);
   const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
+  const t = makeTimeout(90000);
 
   let response;
   try {
     response = await fetch(url, {
       method: 'POST',
+      signal: t.signal,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: MODEL(),
@@ -189,7 +208,10 @@ async function extractProfileFromCV(cvText) {
       }),
     });
   } catch (err) {
+    if (err.name === 'AbortError') throw typedError(BUSY_MESSAGE, 'TIMEOUT');
     throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
+  } finally {
+    t.clear();
   }
 
   if (!response.ok) {
@@ -216,4 +238,93 @@ async function extractProfileFromCV(cvText) {
   return fields;
 }
 
-module.exports = { draftEmail, extractProfileFromCV, PROFILE_FIELDS };
+// ---- Reply classification (Gmail tracking) --------------------------------
+
+const REPLY_STATUSES = ['interview', 'accepted', 'rejected', 'pending', 'none'];
+
+const REPLY_SYSTEM_PROMPT = [
+  'You classify a single email that may be a reply to a student\'s industrial-',
+  'attachment / internship application. You are given the email and a list of',
+  'the companies the student applied to.',
+  'Return ONLY a JSON object with these keys:',
+  '- company: the EXACT company name from the provided list that this email is',
+  '  from or about, or "" if it does not clearly relate to any of them.',
+  '- status: one of interview, accepted, rejected, pending, none.',
+  '    interview = they invite the student to an interview or next step.',
+  '    accepted  = the attachment/internship is offered or confirmed.',
+  '    rejected  = the application is declined / unsuccessful.',
+  '    pending   = a genuine reply acknowledging the application but no decision.',
+  '    none      = not related to an application (newsletter, spam, unrelated).',
+  '- summary: one short sentence (max 20 words) describing the email.',
+  'Only choose a company from the list, matching by sender domain, sender name,',
+  'or clear mention. If unsure, use company "" and status none. No prose, no code',
+  'fences, JSON only.',
+].join('\n');
+
+async function classifyReply(email, companyNames) {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) throw typedError('NVIDIA_API_KEY is not set.', 'NO_API_KEY');
+
+  const list = (companyNames || []).slice(0, 120).map((n, i) => `${i + 1}. ${n}`).join('\n');
+  const userMsg = [
+    'COMPANIES THE STUDENT APPLIED TO:',
+    list || '(none)',
+    '',
+    'EMAIL:',
+    `From: ${email.from || ''}`,
+    `Subject: ${email.subject || ''}`,
+    `Body: ${String(email.body || email.snippet || '').slice(0, 3000)}`,
+    '',
+    'Classify it now as JSON.',
+  ].join('\n');
+
+  const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
+
+  // Runs unattended in the sync job, so cap it (more patient than the
+  // user-facing calls): an aborted call fails fast and the job retries later.
+  const t = makeTimeout(120000);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      signal: t.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: MODEL(),
+        temperature: 0,
+        max_tokens: 512, // headroom for reasoning models that "think" before the JSON
+        messages: [
+          { role: 'system', content: REPLY_SYSTEM_PROMPT },
+          { role: 'user', content: userMsg },
+        ],
+      }),
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw typedError('Classification timed out.', 'TIMEOUT');
+    throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
+  } finally {
+    t.clear();
+  }
+
+  if (!response.ok) {
+    const t = await response.text().catch(() => '');
+    throw typedError(`NVIDIA API returned ${response.status}. ${t.slice(0, 200)}`.trim(), 'API_ERROR');
+  }
+
+  const data = await response.json();
+  const content =
+    data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  const parsed = safeJsonExtract(content);
+  if (!parsed) return { company: '', status: 'none', summary: '' };
+
+  let status = String(parsed.status || 'none').toLowerCase();
+  if (REPLY_STATUSES.indexOf(status) === -1) status = 'none';
+  return {
+    company: parsed.company ? String(parsed.company).trim() : '',
+    status,
+    summary: parsed.summary ? String(parsed.summary).trim() : '',
+  };
+}
+
+module.exports = { draftEmail, extractProfileFromCV, classifyReply, PROFILE_FIELDS };

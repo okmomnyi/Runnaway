@@ -9,10 +9,12 @@ const cookieParser = require('cookie-parser');
 const { pool } = require('./db/pool');
 const { attachUser, requireAuth } = require('./middleware/auth');
 const { startRefreshJob } = require('./jobs/refreshJob');
+const { startGmailSyncJob } = require('./jobs/gmailSyncJob');
 
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const companyRoutes = require('./routes/companies');
+const oauthRoutes = require('./routes/oauth');
 
 const app = express();
 
@@ -84,6 +86,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
 // Auth + profile pages
 app.use('/', authRoutes);
 app.use('/', profileRoutes);
+app.use('/', oauthRoutes);
 
 // API
 app.use('/api/companies', companyRoutes);
@@ -104,4 +107,5 @@ const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, () => {
   console.log(`[server] Attachment Runway listening on port ${PORT}`);
   startRefreshJob();
+  startGmailSyncJob();
 });

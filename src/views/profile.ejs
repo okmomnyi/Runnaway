@@ -16,8 +16,46 @@
   <% if (typeof loadError !== 'undefined' && loadError) { %>
     <div class="alert alert-error" role="alert"><%= loadError %></div>
   <% } %>
+  <% if (typeof gmailNotice !== 'undefined' && gmailNotice) { %>
+    <div class="alert alert-<%= gmailNotice.kind %>" role="status"><%= gmailNotice.text %></div>
+  <% } %>
 
   <% if (profile) { %>
+  <% var gm = (typeof gmail !== 'undefined') ? gmail : null; %>
+  <section class="cv-import card" aria-labelledby="gmail-title">
+    <div class="cv-import-head">
+      <div>
+        <h2 class="cv-import-title" id="gmail-title">Track replies from your Gmail</h2>
+        <p class="cv-import-sub">Connect Gmail (read-only) and the tracker checks for company replies, then updates each company's status (interview, accepted, rejected) and adds a note automatically. It never sends or changes email.</p>
+      </div>
+    </div>
+    <% if (gm && gm.connected) { %>
+      <div class="gmail-status">
+        <span class="gmail-dot gmail-dot-on" aria-hidden="true"></span>
+        <div>
+          <p class="gmail-line">Connected as <strong><%= gm.email %></strong></p>
+          <p class="gmail-sub">
+            <% if (gm.lastSync) { %>Last checked <%= new Date(gm.lastSync).toLocaleString() %>.<% } else { %>Waiting for the first check (runs on a schedule).<% } %>
+          </p>
+        </div>
+        <form action="/oauth/google/disconnect" method="POST" class="gmail-actions">
+          <button type="submit" class="btn btn-ghost">Disconnect</button>
+        </form>
+      </div>
+    <% } else if (gm && gm.configured) { %>
+      <div class="gmail-status">
+        <span class="gmail-dot gmail-dot-off" aria-hidden="true"></span>
+        <p class="gmail-line">Not connected.</p>
+        <a href="/oauth/google/connect" class="btn btn-primary gmail-actions">Connect Gmail</a>
+      </div>
+    <% } else { %>
+      <div class="gmail-status">
+        <span class="gmail-dot gmail-dot-off" aria-hidden="true"></span>
+        <p class="gmail-sub">Gmail tracking isn't configured on the server yet. Once the Google credentials are set, a Connect button appears here.</p>
+      </div>
+    <% } %>
+  </section>
+
   <section class="cv-import card" aria-labelledby="cv-import-title">
     <div class="cv-import-head">
       <div>
