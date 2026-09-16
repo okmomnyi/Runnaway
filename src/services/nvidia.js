@@ -4,7 +4,24 @@
 // endpoint. The API key never reaches the browser.
 
 const BASE_URL = () => process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
-const MODEL = () => process.env.NVIDIA_MODEL || 'openai/gpt-oss-20b';
+
+// Model availability on NVIDIA's free tier flips constantly (a model that is
+// fast now may return 503 "overloaded" a minute later, or reach end-of-life
+// and 410). So instead of one model we keep a list and try them in order,
+// using whichever responds first and remembering that winner for next time.
+const DEFAULT_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b',
+  'openai/gpt-oss-20b',
+  'mistralai/mistral-nemotron',
+];
+
+function modelList() {
+  const raw = process.env.NVIDIA_MODELS || process.env.NVIDIA_MODEL || DEFAULT_MODELS.join(',');
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+// Sticky preference: the last model that answered goes to the front next time.
+let lastGoodModel = null;
 
 function typedError(message, code) {
   const err = new Error(message);
@@ -12,17 +29,84 @@ function typedError(message, code) {
   return err;
 }
 
-// AbortController-based timeout. User-facing calls (draft, CV) default to 90s
-// so they return a clean error before Cloudflare's ~100s origin timeout 524s.
-// Override per call, or globally via NVIDIA_TIMEOUT_MS.
-function makeTimeout(defaultMs) {
-  const ms = Number(process.env.NVIDIA_TIMEOUT_MS) || defaultMs || 90000;
+function abortAfter(ms) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return { signal: controller.signal, clear: () => clearTimeout(timer) };
 }
 
 const BUSY_MESSAGE = 'The AI service is busy right now. Please try again in a moment.';
+
+// Try each model in turn until one returns content. A model that errors (503
+// overloaded, 500, 404, 410 end-of-life) or is too slow is skipped and the
+// next is tried. `overallTimeoutMs` bounds the whole attempt so user-facing
+// calls stay under Cloudflare's ~100s origin limit; `perModelMs` bounds each
+// single model so a hung one doesn't eat the whole budget.
+async function chatCompletion(messages, opts) {
+  opts = opts || {};
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) {
+    throw typedError(
+      'NVIDIA_API_KEY is not set. Add it to your .env to enable AI features.',
+      'NO_API_KEY'
+    );
+  }
+
+  const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
+  const perModelMs = opts.perModelMs || Number(process.env.NVIDIA_MODEL_TIMEOUT_MS) || 30000;
+  const deadline = Date.now() + (opts.overallTimeoutMs || Number(process.env.NVIDIA_TIMEOUT_MS) || 90000);
+
+  // Order models with the last winner first.
+  let models = modelList();
+  if (lastGoodModel && models.indexOf(lastGoodModel) !== -1) {
+    models = [lastGoodModel].concat(models.filter((m) => m !== lastGoodModel));
+  }
+
+  let lastErr = null;
+  for (const model of models) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 500) break; // out of overall budget
+    const t = abortAfter(Math.min(perModelMs, remaining));
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        signal: t.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          temperature: opts.temperature != null ? opts.temperature : 0.3,
+          max_tokens: opts.maxTokens || 600,
+          messages,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        lastErr = typedError(`${model}: ${response.status} ${detail.slice(0, 120)}`.trim(), 'API_ERROR');
+        continue; // overloaded / gone / not-found -> next model
+      }
+      const data = await response.json();
+      const content =
+        data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!content || !content.trim()) {
+        lastErr = typedError(`${model}: empty response`, 'EMPTY_RESPONSE');
+        continue;
+      }
+      lastGoodModel = model; // remember the winner
+      return content.trim();
+    } catch (err) {
+      lastErr = err.name === 'AbortError'
+        ? typedError(`${model}: timed out`, 'TIMEOUT')
+        : typedError(`${model}: ${err.message}`, 'REQUEST_FAILED');
+      continue;
+    } finally {
+      t.clear();
+    }
+  }
+  // Nothing worked within budget.
+  const err = typedError(BUSY_MESSAGE, 'TIMEOUT');
+  err.detail = lastErr ? lastErr.message : 'no models available';
+  throw err;
+}
 
 const SYSTEM_PROMPT = [
   'You write short, specific, professional cold emails requesting an industrial',
@@ -66,69 +150,13 @@ function buildUserMessage(profile, company) {
 }
 
 async function draftEmail(profile, company) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) {
-    throw typedError(
-      'NVIDIA_API_KEY is not set. Add it to your .env to enable AI drafting.',
-      'NO_API_KEY'
-    );
-  }
-
-  const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
-  const t = makeTimeout(90000);
-
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      signal: t.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL(),
-        temperature: 0.6,
-        max_tokens: 600,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserMessage(profile, company) },
-        ],
-      }),
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') throw typedError(BUSY_MESSAGE, 'TIMEOUT');
-    throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
-  } finally {
-    t.clear();
-  }
-
-  if (!response.ok) {
-    let detail = '';
-    try {
-      detail = await response.text();
-    } catch (_) {
-      /* ignore */
-    }
-    throw typedError(
-      `NVIDIA API returned ${response.status}. ${detail.slice(0, 300)}`.trim(),
-      'API_ERROR'
-    );
-  }
-
-  const data = await response.json();
-  const content =
-    data &&
-    data.choices &&
-    data.choices[0] &&
-    data.choices[0].message &&
-    data.choices[0].message.content;
-
-  if (!content || !content.trim()) {
-    throw typedError('NVIDIA API returned an empty draft.', 'EMPTY_RESPONSE');
-  }
-
-  return content.trim();
+  return chatCompletion(
+    [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: buildUserMessage(profile, company) },
+    ],
+    { temperature: 0.6, maxTokens: 600, overallTimeoutMs: 90000 }
+  );
 }
 
 // ---- CV -> profile extraction ---------------------------------------------
@@ -178,51 +206,15 @@ function safeJsonExtract(raw) {
 }
 
 async function extractProfileFromCV(cvText) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) {
-    throw typedError(
-      'NVIDIA_API_KEY is not set. Add it to your .env to enable CV import.',
-      'NO_API_KEY'
-    );
-  }
-
   // Keep the prompt within sane bounds for the model's context window.
   const text = String(cvText || '').slice(0, 12000);
-  const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
-  const t = makeTimeout(90000);
-
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      signal: t.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: MODEL(),
-        temperature: 0.1,
-        max_tokens: 700,
-        messages: [
-          { role: 'system', content: CV_SYSTEM_PROMPT },
-          { role: 'user', content: 'CV TEXT:\n\n' + text },
-        ],
-      }),
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') throw typedError(BUSY_MESSAGE, 'TIMEOUT');
-    throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
-  } finally {
-    t.clear();
-  }
-
-  if (!response.ok) {
-    let detail = '';
-    try { detail = await response.text(); } catch (_) { /* ignore */ }
-    throw typedError(`NVIDIA API returned ${response.status}. ${detail.slice(0, 300)}`.trim(), 'API_ERROR');
-  }
-
-  const data = await response.json();
-  const content =
-    data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  const content = await chatCompletion(
+    [
+      { role: 'system', content: CV_SYSTEM_PROMPT },
+      { role: 'user', content: 'CV TEXT:\n\n' + text },
+    ],
+    { temperature: 0.1, maxTokens: 700, overallTimeoutMs: 90000 }
+  );
 
   const parsed = safeJsonExtract(content);
   if (!parsed) {
@@ -262,9 +254,6 @@ const REPLY_SYSTEM_PROMPT = [
 ].join('\n');
 
 async function classifyReply(email, companyNames) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) throw typedError('NVIDIA_API_KEY is not set.', 'NO_API_KEY');
-
   const list = (companyNames || []).slice(0, 120).map((n, i) => `${i + 1}. ${n}`).join('\n');
   const userMsg = [
     'COMPANIES THE STUDENT APPLIED TO:',
@@ -278,43 +267,16 @@ async function classifyReply(email, companyNames) {
     'Classify it now as JSON.',
   ].join('\n');
 
-  const url = `${BASE_URL().replace(/\/$/, '')}/chat/completions`;
+  // Runs unattended in the sync job, so give it a more patient overall budget
+  // than the user-facing calls; the model fallback still skips overloaded ones.
+  const content = await chatCompletion(
+    [
+      { role: 'system', content: REPLY_SYSTEM_PROMPT },
+      { role: 'user', content: userMsg },
+    ],
+    { temperature: 0, maxTokens: 512, overallTimeoutMs: 150000 }
+  );
 
-  // Runs unattended in the sync job, so cap it (more patient than the
-  // user-facing calls): an aborted call fails fast and the job retries later.
-  const t = makeTimeout(120000);
-
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      signal: t.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: MODEL(),
-        temperature: 0,
-        max_tokens: 512, // headroom for reasoning models that "think" before the JSON
-        messages: [
-          { role: 'system', content: REPLY_SYSTEM_PROMPT },
-          { role: 'user', content: userMsg },
-        ],
-      }),
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') throw typedError('Classification timed out.', 'TIMEOUT');
-    throw typedError(`Could not reach the NVIDIA API: ${err.message}`, 'REQUEST_FAILED');
-  } finally {
-    t.clear();
-  }
-
-  if (!response.ok) {
-    const t = await response.text().catch(() => '');
-    throw typedError(`NVIDIA API returned ${response.status}. ${t.slice(0, 200)}`.trim(), 'API_ERROR');
-  }
-
-  const data = await response.json();
-  const content =
-    data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
   const parsed = safeJsonExtract(content);
   if (!parsed) return { company: '', status: 'none', summary: '' };
 
