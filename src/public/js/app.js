@@ -350,7 +350,10 @@
     btn.textContent = 'Drafting…';
     area.classList.add('show');
     area.innerHTML = '';
-    area.appendChild(el('div', { class: 'draft-status', text: 'Contacting the AI to write a first draft…' }));
+    area.appendChild(el('div', { class: 'draft-status draft-loading' }, [
+      el('span', { class: 'spinner', attrs: { 'aria-hidden': 'true' } }),
+      el('span', { text: 'Contacting the AI to write a first draft…' }),
+    ]));
 
     api('POST', '/api/companies/' + company.id + '/draft')
       .then(function (updated) {
@@ -387,13 +390,25 @@
   // ---- Remove -------------------------------------------------------------
 
   function onRemove(company) {
-    if (!window.confirm('Remove "' + company.name + '" from your tracker? This cannot be undone.')) return;
-    api('DELETE', '/api/companies/' + company.id)
-      .then(function () {
-        companies = companies.filter(function (c) { return c.id !== company.id; });
-        render();
-      })
-      .catch(function (err) { alert('Could not remove: ' + err.message); });
+    var ask = window.confirmDialog
+      ? window.confirmDialog({
+          title: 'Remove company?',
+          message: 'Remove "' + company.name + '" from your tracker? This cannot be undone.',
+          confirmLabel: 'Remove',
+          cancelLabel: 'Keep',
+          danger: true,
+        })
+      : Promise.resolve(window.confirm('Remove "' + company.name + '"? This cannot be undone.'));
+
+    ask.then(function (ok) {
+      if (!ok) return;
+      api('DELETE', '/api/companies/' + company.id)
+        .then(function () {
+          companies = companies.filter(function (c) { return c.id !== company.id; });
+          render();
+        })
+        .catch(function (err) { alert('Could not remove: ' + err.message); });
+    });
   }
 
   // ---- Add ----------------------------------------------------------------

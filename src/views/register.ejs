@@ -1,7 +1,7 @@
 <%- include('partials/head', { title: 'Create account — Attachment Runway' }) %>
 <%- include('partials/nav', { active: '' }) %>
 
-<main class="auth-main">
+<main class="auth-main" id="main">
   <section class="auth-card" aria-labelledby="auth-title">
     <img class="auth-logo" src="/public/logo.jpeg" width="72" height="72" alt="Attachment Runway logo: a hooded figure with glowing eyes" />
     <h1 id="auth-title" class="auth-title">Create your account</h1>
@@ -19,14 +19,20 @@
       </label>
       <label class="field">
         <span class="field-label">Password</span>
-        <input class="input" type="password" name="password" autocomplete="new-password"
-               minlength="8" required />
+        <div class="pw-field">
+          <input class="input" id="reg-password" type="password" name="password" autocomplete="new-password"
+                 minlength="8" required />
+          <button type="button" class="pw-toggle" data-target="reg-password"></button>
+        </div>
         <span class="field-hint">At least 8 characters.</span>
       </label>
       <label class="field">
         <span class="field-label">Confirm password</span>
-        <input class="input" type="password" name="confirm" autocomplete="new-password"
-               minlength="8" required />
+        <div class="pw-field">
+          <input class="input" id="reg-confirm" type="password" name="confirm" autocomplete="new-password"
+                 minlength="8" required />
+          <button type="button" class="pw-toggle" data-target="reg-confirm"></button>
+        </div>
       </label>
       <button type="submit" class="btn btn-primary btn-block">Create account</button>
     </form>

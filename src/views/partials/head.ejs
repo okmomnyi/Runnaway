@@ -16,5 +16,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/public/css/style.css?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>" />
+  <script>
+    // Apply the saved theme before first paint to avoid a flash. When nothing
+    // is stored we leave the attribute off so CSS follows prefers-color-scheme.
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>

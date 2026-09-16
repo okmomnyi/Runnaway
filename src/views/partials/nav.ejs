@@ -4,15 +4,23 @@
         <img class="brand-mark" src="/public/logo.jpeg" width="30" height="30" alt="Attachment Runway logo: a hooded figure with glowing eyes" />
         <span class="brand-text">Attachment&nbsp;Runway</span>
       </a>
-      <% if (user) { %>
-        <nav class="nav-links" aria-label="Primary">
-          <a href="/dashboard" class="nav-link<%= typeof active !== 'undefined' && active === 'dashboard' ? ' is-active' : '' %>">Dashboard</a>
-          <a href="/profile" class="nav-link<%= typeof active !== 'undefined' && active === 'profile' ? ' is-active' : '' %>">Profile</a>
-          <span class="nav-email" title="<%= user.email %>"><%= user.email %></span>
-          <form action="/logout" method="POST" class="logout-form">
-            <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
-          </form>
-        </nav>
-      <% } %>
+      <div class="nav-right">
+        <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme"></button>
+        <% if (user) { %>
+          <button type="button" class="icon-btn nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+            </svg>
+          </button>
+          <nav class="nav-links" id="primary-nav" aria-label="Primary">
+            <a href="/dashboard" class="nav-link<%= typeof active !== 'undefined' && active === 'dashboard' ? ' is-active' : '' %>">Dashboard</a>
+            <a href="/profile" class="nav-link<%= typeof active !== 'undefined' && active === 'profile' ? ' is-active' : '' %>">Profile</a>
+            <span class="nav-email" title="<%= user.email %>"><%= user.email %></span>
+            <form action="/logout" method="POST" class="logout-form">
+              <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
+            </form>
+          </nav>
+        <% } %>
+      </div>
     </div>
   </header>

@@ -1,7 +1,7 @@
 <%- include('partials/head', { title: 'Dashboard — Attachment Runway' }) %>
 <%- include('partials/nav', { active: 'dashboard' }) %>
 
-<main class="page">
+<main class="page" id="main">
   <div class="page-head">
     <h1 class="page-title">Application tracker</h1>
     <p class="page-sub">Nairobi &amp; Mombasa attachment targets. Update status as you go; draft a cold email when you're ready to reach out.</p>
@@ -94,6 +94,23 @@
       <p class="empty-title">No companies match your filters.</p>
       <p class="empty-sub">Try clearing the search or filters, or add a new company.</p>
     </div>
+  </section>
+
+  <!-- Help / FAQ -->
+  <section class="faq" aria-labelledby="faq-title">
+    <h2 class="faq-title" id="faq-title">How this works</h2>
+    <details class="faq-item">
+      <summary>What does "needs re-verification" mean?</summary>
+      <p>A weekly job checks that each company's website is still reachable. If a company hasn't been checked in the last <%= staleAfterDays %> days, it's flagged so you know to confirm it yourself. It does not claim to know live vacancy status.</p>
+    </details>
+    <details class="faq-item">
+      <summary>How are the cold-email drafts generated?</summary>
+      <p>Drafts are written from the details on your <a href="/profile">profile</a> only — real skills and background, never invented experience. Nothing is ever sent for you; you review, edit, and send each email yourself.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Where is my data stored?</summary>
+      <p>Everything lives in your own database on your own server. There are no third-party trackers, and the app sets only one essential cookie to keep you signed in.</p>
+    </details>
   </section>
 </main>
 

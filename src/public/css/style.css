@@ -112,6 +112,37 @@
   }
 }
 
+/* Forced light via the theme toggle (wins even when the OS prefers dark). */
+:root[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg-glow: radial-gradient(1000px 480px at 50% -10%, rgba(42, 168, 216, 0.10), transparent 60%);
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #dde2ec;
+  --border-strong: #c4ccda;
+  --text: #131722;
+  --text-muted: #545d70;
+  --text-faint: #8a92a3;
+  --brand-bar: rgba(12, 14, 18, 0.92);
+  --accent: #0e86b8;
+  --accent-strong: #0b6d96;
+  --on-accent: #ffffff;
+  --focus: #0e86b8;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 20px rgba(16, 24, 40, 0.07);
+  --st-notapplied-bg: #e8ebf1;   --st-notapplied-fg: #4a5263;
+  --st-applied-bg: #dbeafe;      --st-applied-fg: #1d4ed8;
+  --st-pending-bg: #fef3c7;      --st-pending-fg: #92600a;
+  --st-interview-bg: #ede9fe;    --st-interview-fg: #6d28d9;
+  --st-accepted-bg: #dcfce7;     --st-accepted-fg: #15803d;
+  --st-rejected-bg: #fee2e2;     --st-rejected-fg: #b91c1c;
+  --st-skip-bg: #eceef2;         --st-skip-fg: #6b7280;
+  --danger: #c62828;
+  --danger-bg: #fee2e2;
+  --danger-border: #f0b4b4;
+  --success: #15803d;
+  --warn: #92600a;
+}
+
 /* ---- Base ---------------------------------------------------------------- */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -164,6 +195,16 @@ a:hover { color: var(--accent-strong); text-decoration: underline; }
 .nav-link:hover, .nav-link.is-active { color: #fff; text-decoration: none; }
 .nav-link.is-active { border-bottom: 2px solid var(--accent); padding-bottom: 2px; }
 .nav-email { color: rgba(243, 245, 248, 0.5); font-size: var(--fs-sm); font-family: var(--font-mono); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-right { display: flex; align-items: center; gap: var(--sp-3); }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; padding: 0; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06); color: #f3f5f8;
+  border: 1px solid rgba(255, 255, 255, 0.12); cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.14); border-color: var(--accent); }
+.nav-toggle { display: none; }
 .logout-form { margin: 0; }
 
 /* ---- Layout -------------------------------------------------------------- */
@@ -355,7 +396,119 @@ a:hover { color: var(--accent-strong); text-decoration: underline; }
 .footer-inner { max-width: 1120px; margin: 0 auto; padding: var(--sp-4); }
 .footer-note { font-size: var(--fs-sm); color: var(--text-faint); margin: 0; text-align: center; }
 
+/* ---- Skip link ----------------------------------------------------------- */
+
+.skip-link {
+  position: absolute; left: var(--sp-3); top: -60px; z-index: 100;
+  background: var(--accent); color: var(--on-accent); font-weight: 600;
+  padding: var(--sp-2) var(--sp-4); border-radius: var(--radius-sm);
+  transition: top 0.15s;
+}
+.skip-link:focus { top: var(--sp-3); text-decoration: none; }
+
+/* ---- Scroll progress ----------------------------------------------------- */
+
+.scroll-progress {
+  position: fixed; top: 0; left: 0; height: 3px; width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  z-index: 40; transition: width 0.05s linear; pointer-events: none;
+}
+
+/* ---- Back to top --------------------------------------------------------- */
+
+.to-top {
+  position: fixed; right: var(--sp-5); bottom: var(--sp-5); z-index: 40;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); cursor: pointer;
+  box-shadow: var(--shadow); transition: transform 0.15s, border-color 0.15s, background-color 0.15s;
+}
+.to-top:hover { border-color: var(--accent); transform: translateY(-2px); }
+.to-top[hidden] { display: none; }
+
+/* ---- Password toggle ----------------------------------------------------- */
+
+.pw-field { position: relative; display: flex; align-items: center; }
+.pw-field .input { padding-right: 42px; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.pw-toggle:hover { color: var(--accent); background: var(--surface-2); }
+
+/* ---- Spinner ------------------------------------------------------------- */
+
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%; display: inline-block;
+  border: 2px solid var(--border-strong); border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite; vertical-align: middle;
+}
+.draft-loading { display: inline-flex; align-items: center; gap: var(--sp-2); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.6s; } }
+
+/* ---- Confirm modal ------------------------------------------------------- */
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex;
+  align-items: center; justify-content: center; padding: var(--sp-4);
+  background: rgba(4, 8, 16, 0.6); backdrop-filter: blur(2px);
+  animation: fade 0.12s ease-out;
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: var(--sp-5); width: 100%; max-width: 420px;
+}
+.modal-title { font-size: var(--fs-lg); font-weight: 600; }
+.modal-message { color: var(--text-muted); margin: var(--sp-2) 0 var(--sp-5); }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-3); }
+.btn-danger-solid { background: var(--danger); color: #fff; }
+.btn-danger-solid:hover:not(:disabled) { filter: brightness(0.94); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- FAQ / help ---------------------------------------------------------- */
+
+.faq { margin-top: var(--sp-7); }
+.faq-title { font-size: var(--fs-lg); font-weight: 600; margin-bottom: var(--sp-3); }
+.faq-item {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); margin-bottom: var(--sp-2); overflow: hidden;
+}
+.faq-item summary {
+  cursor: pointer; padding: var(--sp-3) var(--sp-4); font-weight: 600;
+  list-style: none; display: flex; justify-content: space-between; align-items: center;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after { content: "+"; font-family: var(--font-mono); color: var(--accent); font-size: var(--fs-lg); }
+.faq-item[open] summary::after { content: "\2212"; }
+.faq-item p { margin: 0; padding: 0 var(--sp-4) var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm); }
+
 /* ---- Responsive ---------------------------------------------------------- */
+
+/* Collapse the primary nav into a dropdown driven by the hamburger. */
+@media (max-width: 720px) {
+  .nav-toggle { display: inline-flex; }
+  .nav-links {
+    display: none; position: absolute; top: 100%; right: var(--sp-4);
+    flex-direction: column; align-items: stretch; gap: var(--sp-3);
+    background: var(--brand-bar); backdrop-filter: saturate(140%) blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm);
+    padding: var(--sp-4); min-width: 200px; box-shadow: var(--shadow);
+  }
+  .nav-links.open { display: flex; }
+  .nav-email { max-width: none; }
+  /* The dropdown keeps the dark nav background, so force legible light text
+     on the ghost logout button regardless of the active theme. */
+  .nav-links .btn-ghost {
+    width: 100%; justify-content: center;
+    color: #f3f5f8; border-color: rgba(255, 255, 255, 0.28);
+  }
+  .nav-links .btn-ghost:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--accent); }
+}
 
 @media (max-width: 860px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
@@ -371,4 +524,22 @@ a:hover { color: var(--accent-strong); text-decoration: underline; }
   .nav-email { display: none; }
   .company-top { flex-direction: column; }
   .company-dates { flex-direction: column; }
+}
+
+/* ---- Print --------------------------------------------------------------- */
+
+@media print {
+  :root { --shadow: none; }
+  body { background: #fff !important; color: #000; }
+  .site-nav, .site-footer, .controls, .scroll-progress, .to-top,
+  .skip-link, .company-actions, .faq, .theme-toggle, .nav-toggle,
+  .draft-area, .modal-overlay { display: none !important; }
+  .page { padding: 0; max-width: none; }
+  .company, .card, .stat {
+    border: 1px solid #ccc !important; box-shadow: none !important;
+    break-inside: avoid; background: #fff !important;
+  }
+  .company-name, .page-title, .stat-num { color: #000 !important; }
+  a { color: #000; text-decoration: underline; }
+  .status-select { border: 1px solid #999 !important; }
 }
