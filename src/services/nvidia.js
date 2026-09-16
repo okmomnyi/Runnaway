@@ -118,6 +118,13 @@ async function chatCompletion(messages, opts) {
         lastErr = typedError(`${model}: empty response`, 'EMPTY_RESPONSE');
         continue;
       }
+      // Reject output that fails the caller's shape check (e.g. a reasoning
+      // model that leaked its chain-of-thought instead of the email/JSON), and
+      // fall through to the next model.
+      if (opts.validate && !opts.validate(content)) {
+        lastErr = typedError(`${model}: output failed validation (likely reasoning leak)`, 'BAD_OUTPUT');
+        continue;
+      }
       lastGoodModel = model; // remember the winner
       return content.trim();
     } catch (err) {
@@ -182,7 +189,13 @@ async function draftEmail(profile, company) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: buildUserMessage(profile, company) },
     ],
-    { temperature: 0.6, maxTokens: 600, overallTimeoutMs: 90000 }
+    {
+      temperature: 0.6,
+      maxTokens: 600,
+      overallTimeoutMs: 90000,
+      // A valid draft starts at the Subject line. Anything else is a leak.
+      validate: (c) => /^\s*Subject\s*:/i.test(c),
+    }
   );
 }
 
@@ -240,7 +253,12 @@ async function extractProfileFromCV(cvText) {
       { role: 'system', content: CV_SYSTEM_PROMPT },
       { role: 'user', content: 'CV TEXT:\n\n' + text },
     ],
-    { temperature: 0.1, maxTokens: 700, overallTimeoutMs: 90000 }
+    {
+      temperature: 0.1,
+      maxTokens: 700,
+      overallTimeoutMs: 90000,
+      validate: (c) => safeJsonExtract(c) !== null,
+    }
   );
 
   const parsed = safeJsonExtract(content);
@@ -301,7 +319,12 @@ async function classifyReply(email, companyNames) {
       { role: 'system', content: REPLY_SYSTEM_PROMPT },
       { role: 'user', content: userMsg },
     ],
-    { temperature: 0, maxTokens: 512, overallTimeoutMs: 150000 }
+    {
+      temperature: 0,
+      maxTokens: 512,
+      overallTimeoutMs: 150000,
+      validate: (c) => safeJsonExtract(c) !== null,
+    }
   );
 
   const parsed = safeJsonExtract(content);
