@@ -1,0 +1,101 @@
+<%- include('partials/head', { title: 'Dashboard — Attachment Runway' }) %>
+<%- include('partials/nav', { active: 'dashboard' }) %>
+
+<main class="page">
+  <div class="page-head">
+    <h1 class="page-title">Application tracker</h1>
+    <p class="page-sub">Nairobi &amp; Mombasa attachment targets. Update status as you go; draft a cold email when you're ready to reach out.</p>
+  </div>
+
+  <% if (typeof loadError !== 'undefined' && loadError) { %>
+    <div class="alert alert-error" role="alert"><%= loadError %></div>
+  <% } %>
+
+  <% if (!profileComplete) { %>
+    <div class="alert alert-info" role="status">
+      Your profile is empty, so email drafting is disabled. <a href="/profile">Add your details</a> to enable it.
+    </div>
+  <% } %>
+
+  <!-- Data handed to the client. Rendering happens in /public/js/app.js. -->
+  <script type="application/json" id="companies-data"><%- JSON.stringify(companies) %></script>
+  <script type="application/json" id="app-config"><%- JSON.stringify({ staleAfterDays: staleAfterDays, profileComplete: profileComplete }) %></script>
+
+  <!-- Stats strip -->
+  <section class="stats" id="stats" aria-label="Application status counts"></section>
+
+  <!-- Controls -->
+  <section class="controls" aria-label="Filters">
+    <div class="controls-row">
+      <input class="input search" id="search" type="search" placeholder="Search name or location…" aria-label="Search companies" />
+      <select class="input select" id="filter-sector" aria-label="Filter by sector">
+        <option value="">All sectors</option>
+      </select>
+      <select class="input select" id="filter-status" aria-label="Filter by status">
+        <option value="">All statuses</option>
+      </select>
+      <select class="input select" id="filter-priority" aria-label="Filter by priority">
+        <option value="">All priorities</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+      </select>
+      <button class="btn btn-ghost" id="reset-filters" type="button">Reset</button>
+      <button class="btn btn-primary" id="toggle-add" type="button" aria-expanded="false">+ Add company</button>
+    </div>
+
+    <!-- Add company form (hidden until toggled) -->
+    <form class="add-form card" id="add-form" hidden>
+      <div class="grid-3">
+        <label class="field">
+          <span class="field-label">Name <span class="req">*</span></span>
+          <input class="input" type="text" name="name" id="add-name" required />
+        </label>
+        <label class="field">
+          <span class="field-label">Sector</span>
+          <select class="input" name="sector" id="add-sector"></select>
+        </label>
+        <label class="field">
+          <span class="field-label">Location</span>
+          <input class="input" type="text" name="location" id="add-location" />
+        </label>
+      </div>
+      <div class="grid-3">
+        <label class="field">
+          <span class="field-label">Priority</span>
+          <select class="input" name="priority" id="add-priority">
+            <option value="High">High</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Contact</span>
+          <input class="input" type="text" name="contact" id="add-contact" />
+        </label>
+        <label class="field">
+          <span class="field-label">Website</span>
+          <input class="input" type="url" name="website" id="add-website" placeholder="https://…" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Add company</button>
+        <button type="button" class="btn btn-ghost" id="cancel-add">Cancel</button>
+        <span class="form-msg" id="add-msg" role="alert"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- Results -->
+  <section class="results" aria-live="polite">
+    <p class="results-count" id="results-count"></p>
+    <div class="company-list" id="company-list"></div>
+    <div class="empty-state" id="empty-state" hidden>
+      <p class="empty-title">No companies match your filters.</p>
+      <p class="empty-sub">Try clearing the search or filters, or add a new company.</p>
+    </div>
+  </section>
+</main>
+
+<%- include('partials/foot') %>
+<script src="/public/js/app.js" defer></script>

@@ -1,0 +1,82 @@
+<%- include('partials/head', { title: 'Profile — Attachment Runway' }) %>
+<%- include('partials/nav', { active: 'profile' }) %>
+
+<main class="page">
+  <div class="page-head">
+    <h1 class="page-title">Your profile</h1>
+    <p class="page-sub">These details are used to personalize the AI-drafted cold emails. Nothing here is invented for you — the drafts use only what you enter.</p>
+  </div>
+
+  <% if (typeof welcome !== 'undefined' && welcome) { %>
+    <div class="alert alert-info" role="status">Account created. Fill in your profile so your drafted emails sound like you.</div>
+  <% } %>
+  <% if (typeof saved !== 'undefined' && saved) { %>
+    <div class="alert alert-success" role="status">Profile saved.</div>
+  <% } %>
+  <% if (typeof loadError !== 'undefined' && loadError) { %>
+    <div class="alert alert-error" role="alert"><%= loadError %></div>
+  <% } %>
+
+  <% if (profile) { %>
+  <form action="/profile" method="POST" class="form card profile-form">
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Full name</span>
+        <input class="input" type="text" name="full_name" value="<%= profile.full_name %>" placeholder="e.g. Ondimu Kelvin Momanyi" />
+      </label>
+      <label class="field">
+        <span class="field-label">Phone</span>
+        <input class="input" type="text" name="phone" value="<%= profile.phone %>" />
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Contact email</span>
+        <input class="input" type="email" name="contact_email" value="<%= profile.contact_email %>" />
+      </label>
+      <label class="field">
+        <span class="field-label">University</span>
+        <input class="input" type="text" name="university" value="<%= profile.university %>" placeholder="e.g. BSc Computer Science, Meru University of Science & Technology" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field-label">Certifications</span>
+      <input class="input" type="text" name="certifications" value="<%= profile.certifications %>" placeholder="e.g. CompTIA Network+" />
+    </label>
+
+    <label class="field">
+      <span class="field-label">Focus summary</span>
+      <textarea class="input textarea" name="focus_summary" rows="3" placeholder="What you're focused on — e.g. web app security, pentesting fundamentals, OWASP, cloud deployment."><%= profile.focus_summary %></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Skills</span>
+      <textarea class="input textarea" name="skills" rows="2" placeholder="Concrete skills you actually have."><%= profile.skills %></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Cloud / infrastructure</span>
+      <textarea class="input textarea" name="cloud_infra" rows="2" placeholder="e.g. AWS deployment experience."><%= profile.cloud_infra %></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Recent activity</span>
+      <textarea class="input textarea" name="recent_activity" rows="2" placeholder="e.g. AWS User Group Pwani organizer, projects, events."><%= profile.recent_activity %></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Availability note</span>
+      <input class="input" type="text" name="availability_note" value="<%= profile.availability_note %>" />
+    </label>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save profile</button>
+      <a href="/dashboard" class="btn btn-ghost">Back to dashboard</a>
+    </div>
+  </form>
+  <% } %>
+</main>
+
+<%- include('partials/foot') %>

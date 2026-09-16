@@ -1,0 +1,37 @@
+<%- include('partials/head', { title: 'Create account — Attachment Runway' }) %>
+<%- include('partials/nav', { active: '' }) %>
+
+<main class="auth-main">
+  <section class="auth-card" aria-labelledby="auth-title">
+    <h1 id="auth-title" class="auth-title">Create your account</h1>
+    <p class="auth-sub">Set up your own private tracker. It takes a moment.</p>
+
+    <% if (error) { %>
+      <div class="alert alert-error" role="alert"><%= error %></div>
+    <% } %>
+
+    <form action="/register" method="POST" class="form" novalidate>
+      <label class="field">
+        <span class="field-label">Email</span>
+        <input class="input" type="email" name="email" autocomplete="email"
+               value="<%= values.email %>" required autofocus />
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input class="input" type="password" name="password" autocomplete="new-password"
+               minlength="8" required />
+        <span class="field-hint">At least 8 characters.</span>
+      </label>
+      <label class="field">
+        <span class="field-label">Confirm password</span>
+        <input class="input" type="password" name="confirm" autocomplete="new-password"
+               minlength="8" required />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <p class="auth-alt">Already have an account? <a href="/login">Log in</a></p>
+  </section>
+</main>
+
+<%- include('partials/foot') %>

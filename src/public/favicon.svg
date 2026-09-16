@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Attachment Runway">
+  <rect width="64" height="64" rx="14" fill="#1b2a4a"/>
+  <!-- runway in perspective -->
+  <polygon points="28,54 36,54 40,14 24,14" fill="#2f4570"/>
+  <!-- centre dashes -->
+  <g fill="#f5b301">
+    <rect x="31" y="18" width="2.4" height="5" rx="1"/>
+    <rect x="31" y="27" width="2.4" height="5.5" rx="1"/>
+    <rect x="30.6" y="37" width="2.8" height="6" rx="1"/>
+    <rect x="30.4" y="47" width="3.2" height="6.5" rx="1"/>
+  </g>
+  <!-- threshold lights -->
+  <circle cx="26" cy="52" r="2" fill="#f5b301"/>
+  <circle cx="38" cy="52" r="2" fill="#f5b301"/>
+</svg>

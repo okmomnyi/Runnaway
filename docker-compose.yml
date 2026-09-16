@@ -1,0 +1,13 @@
+# Single "app" service. The database is Neon (remote), so there is no local
+# Postgres container here — the app just needs DATABASE_URL in your .env.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Force the in-container port to 3000 regardless of host mapping.
+      PORT: 3000
