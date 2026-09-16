@@ -37,6 +37,37 @@ function abortAfter(ms) {
 
 const BUSY_MESSAGE = 'The AI service is busy right now. Please try again in a moment.';
 
+// Several of the free-tier models are reasoning models that otherwise dump
+// their chain-of-thought into the answer. Turn that off per model: Nemotron
+// models honor a "detailed thinking off" system directive; gpt-oss takes a
+// reasoning_effort hint. Returns the request body for a given model.
+function buildBody(model, messages, opts) {
+  const body = {
+    model,
+    temperature: opts.temperature != null ? opts.temperature : 0.3,
+    max_tokens: opts.maxTokens || 600,
+    messages,
+  };
+  const m = model.toLowerCase();
+  if (m.indexOf('nemotron') !== -1) {
+    body.messages = [{ role: 'system', content: 'detailed thinking off' }].concat(messages);
+  } else if (m.indexOf('gpt-oss') !== -1) {
+    body.reasoning_effort = 'low';
+  }
+  return body;
+}
+
+// Safety net: strip any reasoning that still leaks through (<think> blocks,
+// gpt-oss "analysis"/"assistantfinal" channel markers).
+function stripReasoning(text) {
+  if (!text) return text;
+  let t = String(text);
+  t = t.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  t = t.replace(/<\/?think>/gi, '');
+  if (/assistantfinal/i.test(t)) t = t.split(/assistantfinal/i).pop();
+  return t.trim();
+}
+
 // Try each model in turn until one returns content. A model that errors (503
 // overloaded, 500, 404, 410 end-of-life) or is too slow is skipped and the
 // next is tried. `overallTimeoutMs` bounds the whole attempt so user-facing
@@ -72,12 +103,7 @@ async function chatCompletion(messages, opts) {
         method: 'POST',
         signal: t.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model,
-          temperature: opts.temperature != null ? opts.temperature : 0.3,
-          max_tokens: opts.maxTokens || 600,
-          messages,
-        }),
+        body: JSON.stringify(buildBody(model, messages, opts)),
       });
       if (!response.ok) {
         const detail = await response.text().catch(() => '');
@@ -85,8 +111,9 @@ async function chatCompletion(messages, opts) {
         continue; // overloaded / gone / not-found -> next model
       }
       const data = await response.json();
-      const content =
+      const raw =
         data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      const content = stripReasoning(raw);
       if (!content || !content.trim()) {
         lastErr = typedError(`${model}: empty response`, 'EMPTY_RESPONSE');
         continue;
