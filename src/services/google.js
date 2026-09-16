@@ -24,7 +24,10 @@ function buildAuthUrl(state) {
     scope: SCOPE,
     access_type: 'offline', // get a refresh token
     prompt: 'consent', // ensure a refresh token is returned
-    include_granted_scopes: 'true',
+    // NOTE: deliberately no include_granted_scopes. If this OAuth client was
+    // ever granted other scopes (Drive/YouTube), merging them in makes Google
+    // reject the request ("scopes that cannot be requested together"). We only
+    // ever want gmail.readonly.
     state: state || '',
   });
   return `${AUTH_URL}?${params.toString()}`;
