@@ -396,6 +396,23 @@ a:hover { color: var(--accent-strong); text-decoration: underline; }
 .footer-inner { max-width: 1120px; margin: 0 auto; padding: var(--sp-4); }
 .footer-note { font-size: var(--fs-sm); color: var(--text-faint); margin: 0; text-align: center; }
 
+/* ---- CV import ----------------------------------------------------------- */
+
+.cv-import { margin-bottom: var(--sp-4); }
+.cv-import-title { font-size: var(--fs-md); font-weight: 600; }
+.cv-import-sub { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--sp-1) 0 var(--sp-4); max-width: 62ch; }
+.cv-import-row { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.cv-file-label { display: inline-flex; align-items: center; gap: var(--sp-3); cursor: pointer; }
+.cv-file-name { font-size: var(--fs-sm); color: var(--text-muted); font-family: var(--font-mono); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.cv-file-input:focus-visible + .cv-import-row .btn,
+.cv-file-label:focus-within .btn-ghost { outline: 2px solid var(--focus); outline-offset: 2px; }
+.cv-import-msg { font-size: var(--fs-sm); margin: var(--sp-3) 0 0; min-height: 1.2em; }
+.cv-msg-info { color: var(--text-muted); }
+.cv-msg-ok { color: var(--success); }
+.cv-msg-error { color: var(--danger); }
+.field-filled { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.18); transition: box-shadow 0.3s, border-color 0.3s; }
+
 /* ---- Skip link ----------------------------------------------------------- */
 
 .skip-link {

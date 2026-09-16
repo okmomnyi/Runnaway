@@ -4,7 +4,7 @@
 <main class="page" id="main">
   <div class="page-head">
     <h1 class="page-title">Your profile</h1>
-    <p class="page-sub">These details are used to personalize the AI-drafted cold emails. Nothing here is invented for you — the drafts use only what you enter.</p>
+    <p class="page-sub">These details are used to personalize the AI-drafted cold emails. Nothing here is invented for you; the drafts use only what you enter.</p>
   </div>
 
   <% if (typeof welcome !== 'undefined' && welcome) { %>
@@ -18,7 +18,25 @@
   <% } %>
 
   <% if (profile) { %>
-  <form action="/profile" method="POST" class="form card profile-form">
+  <section class="cv-import card" aria-labelledby="cv-import-title">
+    <div class="cv-import-head">
+      <div>
+        <h2 class="cv-import-title" id="cv-import-title">Import from your CV</h2>
+        <p class="cv-import-sub">Upload a resume (PDF, DOCX, or TXT) and we'll read the details into the form below for you to review. Nothing is saved until you press Save.</p>
+      </div>
+    </div>
+    <div class="cv-import-row">
+      <label class="cv-file-label" for="cv-file">
+        <span class="btn btn-ghost">Choose file</span>
+        <span class="cv-file-name" id="cv-file-name">No file chosen</span>
+      </label>
+      <input class="cv-file-input" type="file" id="cv-file" accept=".pdf,.docx,.txt,.md" />
+      <button type="button" class="btn btn-primary" id="cv-import-btn" disabled>Extract details</button>
+    </div>
+    <p class="cv-import-msg" id="cv-import-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <form action="/profile" method="POST" class="form card profile-form" id="profile-form">
     <div class="grid-2">
       <label class="field">
         <span class="field-label">Full name</span>
@@ -80,3 +98,4 @@
 </main>
 
 <%- include('partials/foot') %>
+<script src="/public/js/profile.js?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>" defer></script>

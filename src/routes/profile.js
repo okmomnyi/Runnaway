@@ -1,10 +1,19 @@
 'use strict';
 
 const express = require('express');
+const multer = require('multer');
 const { pool } = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
+const { extractText } = require('../services/cvParser');
+const { extractProfileFromCV } = require('../services/nvidia');
 
 const router = express.Router();
+
+// CV uploads are held in memory and parsed on the fly; nothing is written to disk.
+const cvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+});
 
 const FIELDS = [
   'full_name',
@@ -69,6 +78,43 @@ router.post('/profile', requireAuth, async (req, res) => {
       loadError: 'Could not save your profile. Please try again.',
     });
   }
+});
+
+// Parse an uploaded CV and return the extracted fields as JSON. Does not save
+// anything — the client fills the form so the user can review before saving.
+router.post('/profile/import-cv', requireAuth, (req, res) => {
+  cvUpload.single('cv')(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      const msg =
+        uploadErr.code === 'LIMIT_FILE_SIZE'
+          ? 'That file is too large (max 5 MB).'
+          : 'Could not read the uploaded file.';
+      return res.status(400).json({ error: msg });
+    }
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file was uploaded.' });
+
+      const text = await extractText(req.file.buffer, req.file.originalname);
+      if (!text || text.trim().length < 30) {
+        return res
+          .status(422)
+          .json({ error: 'Could not read enough text from that file. Is it a scanned image?' });
+      }
+
+      const fields = await extractProfileFromCV(text);
+      return res.json({ fields });
+    } catch (err) {
+      console.error('[profile] cv import failed:', err.code || '', err.message);
+      const message =
+        err.code === 'NO_API_KEY'
+          ? 'CV import is not configured on the server (missing NVIDIA_API_KEY).'
+          : err.code === 'BAD_TYPE'
+          ? err.message
+          : `Could not import that CV: ${err.message}`;
+      const status = err.code === 'BAD_TYPE' ? 415 : 502;
+      return res.status(status).json({ error: message });
+    }
+  });
 });
 
 module.exports = router;
